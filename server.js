@@ -1,36 +1,60 @@
-const express = require("express");
-const cors = require("cors");
+import express from "express";
+import cors from "cors";
+import pg from "pg";
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 模擬商品資料
-const products = [
-  { id: 1, name: "經典白T", price: 390, image_url: "https://picsum.photos/200?1" },
-  { id: 2, name: "黑色帽T", price: 890, image_url: "https://picsum.photos/200?2" },
-  { id: 3, name: "帆布袋", price: 250, image_url: "https://picsum.photos/200?3" }
-];
-
-// 存放訂單的陣列（暫時記在記憶體）
-const orders = [];
-
-app.get("/api/products", (req, res) => {
-  res.json(products);
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 });
 
-app.post("/api/order", (req, res) => {
-  const order = req.body; // { items: [...], buyer_name, email }
-  order.id = orders.length + 1;
-  order.created_at = new Date();
-  orders.push(order);
-
-  console.log("🧾 收到新訂單：", order);
-  res.json({ message: "訂單已建立", order_id: order.id });
+app.get("/api/products", async (req, res) => {
+  const { rows } = await pool.query("SELECT * FROM products ORDER BY id ASC");
+  res.json(rows);
 });
 
-app.get("/api/orders", (req, res) => {
-  res.json(orders);
+app.post("/api/order", async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { buyer_name, buyer_phone, buyer_email, items } = req.body;
+
+    for (const item of items) {
+      const { rows } = await client.query("SELECT stock, name FROM products WHERE id=$1", [item.id]);
+      const product = rows[0];
+      if (!product) throw new Error(`商品 ${item.id} 不存在`);
+      if (product.stock < item.qty)
+        throw new Error(`商品「${product.name}」庫存不足（剩 ${product.stock} 件）`);
+    }
+
+    const { rows: orderRows } = await client.query(
+      `INSERT INTO orders (buyer_name, buyer_phone, buyer_email)
+       VALUES ($1, $2, $3) RETURNING id`,
+      [buyer_name, buyer_phone, buyer_email]
+    );
+    const orderId = orderRows[0].id;
+
+    for (const item of items) {
+      await client.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [item.qty, item.id]);
+      await client.query(
+        "INSERT INTO order_items (order_id, product_id, quantity) VALUES ($1, $2, $3)",
+        [orderId, item.id, item.qty]
+      );
+    }
+
+    await client.query("COMMIT");
+    res.json({ message: "訂單建立成功", order_id: orderId });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    res.status(400).json({ message: err.message });
+  } finally {
+    client.release();
+  }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Server running on ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Backend running on port ${PORT}`));
