@@ -21,7 +21,7 @@ app.post("/api/order", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    const { buyer_name, buyer_phone, buyer_email, items } = req.body;
+    const { buyer_name, buyer_phone, buyer_line, items } = req.body;
 
     for (const item of items) {
       const { rows } = await client.query("SELECT stock, name FROM products WHERE id=$1", [item.id]);
@@ -32,9 +32,9 @@ app.post("/api/order", async (req, res) => {
     }
 
     const { rows: orderRows } = await client.query(
-      `INSERT INTO orders (buyer_name, buyer_phone, buyer_email)
+      `INSERT INTO orders (buyer_name, buyer_phone, buyer_line)
        VALUES ($1, $2, $3) RETURNING id`,
-      [buyer_name, buyer_phone, buyer_email]
+      [buyer_name, buyer_phone, buyer_line]
     );
     const orderId = orderRows[0].id;
 

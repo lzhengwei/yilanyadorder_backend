@@ -10,7 +10,7 @@ CREATE TABLE orders (
   id SERIAL PRIMARY KEY,
   buyer_name TEXT NOT NULL,
   buyer_phone TEXT NOT NULL,
-  buyer_email TEXT NOT NULL,
+  buyer_line TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
