@@ -31,12 +31,20 @@ app.post("/api/order", async (req, res) => {
         throw new Error(`商品「${product.name}」庫存不足（剩 ${product.stock} 件）`);
     }
 
-    const { rows: orderRows } = await client.query(
-      `INSERT INTO orders (buyer_name, buyer_phone, buyer_line)
-       VALUES ($1, $2, $3) RETURNING id`,
-      [buyer_name, buyer_phone, buyer_line]
-    );
-    const orderId = orderRows[0].id;
+  // === 取得最新的訂單編號 ===
+  const { rows: latestRows } = await client.query("SELECT order_id FROM orders ORDER BY order_id DESC LIMIT 1");
+  let newOrderId = 10000; // 初始起始值
+  if (latestRows.length > 0 && !isNaN(latestRows[0].order_id)) {
+    newOrderId = Number(latestRows[0].order_id) + 1;
+  }
+
+  // === 新增訂單 ===
+  await client.query(
+    `INSERT INTO orders (order_id, buyer_name, buyer_phone, buyer_line)
+    VALUES ($1, $2, $3, $4)`,
+    [newOrderId, buyer_name, buyer_phone, buyer_line]
+  );
+  const orderId = newOrderId;
 
     for (const item of items) {
       await client.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [item.qty, item.id]);
@@ -53,6 +61,50 @@ app.post("/api/order", async (req, res) => {
     res.status(400).json({ message: err.message });
   } finally {
     client.release();
+  }
+});
+
+// ✅ 查詢訂單：可用 order_id 或 buyer_name
+app.get("/api/order/search", async (req, res) => {
+  const { q } = req.query; // 使用 query string，例如 ?q=10001 或 ?q=王小明
+  if (!q) return res.status(400).json({ message: "請輸入查詢關鍵字" });
+
+  try {
+    const client = await pool.connect();
+    let result;
+    if (/^\d+$/.test(q)) {
+      // 🔍 若是數字 → 用訂單編號查詢
+      result = await client.query(
+        `SELECT o.order_id, o.buyer_name, o.buyer_phone, o.buyer_line,
+                p.name AS product_name, p.price, oi.quantity
+         FROM orders o
+         JOIN order_items oi ON o.order_id = oi.order_id
+         JOIN products p ON oi.product_id = p.id
+         WHERE o.order_id = $1`,
+        [q]
+      );
+    } else {
+      // 🔍 若是文字 → 用姓名查詢
+      result = await client.query(
+        `SELECT o.order_id, o.buyer_name, o.buyer_phone, o.buyer_line,
+                p.name AS product_name, p.price, oi.quantity
+         FROM orders o
+         JOIN order_items oi ON o.order_id = oi.order_id
+         JOIN products p ON oi.product_id = p.id
+         WHERE o.buyer_name ILIKE $1
+         ORDER BY o.order_id DESC`,
+        [`%${q}%`]
+      );
+    }
+    client.release();
+
+    if (result.rows.length === 0)
+      return res.status(404).json({ message: "查無訂單" });
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("❌ 查詢訂單失敗", err);
+    res.status(500).json({ message: "伺服器錯誤" });
   }
 });
 
