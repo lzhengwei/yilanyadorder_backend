@@ -23,7 +23,7 @@ app.post("/api/order", async (req, res) => {
 
     const { 
       buyer_name, buyer_phone, buyer_line,
-      delivery_method, pickup_time,
+      delivery_method, pickup_time, soap_box_count,
       receiver_name, receiver_phone, receiver_address,
       items
     } = req.body;
@@ -51,14 +51,14 @@ app.post("/api/order", async (req, res) => {
     `
     INSERT INTO orders (
       order_id, buyer_name, buyer_phone, buyer_line,
-      delivery_method, pickup_time,
+      soap_box_count, delivery_method, pickup_time,
       receiver_name, receiver_phone, receiver_address
     )
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     `,
     [
       newOrderId,
-      buyer_name, buyer_phone, buyer_line,
+      buyer_name, buyer_phone, buyer_line, soap_box_count,
       delivery_method,
       pickup_time || null,
       receiver_name || null,
@@ -102,6 +102,7 @@ app.get("/api/order/search", async (req, res) => {
         o.buyer_name,
         o.buyer_phone,
         o.buyer_line,
+        o.soap_box_count,
         o.delivery_method,
         o.pickup_time,
         o.receiver_name,
