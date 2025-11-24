@@ -54,7 +54,7 @@ app.post("/api/order", async (req, res) => {
       soap_box_count, delivery_method, pickup_time,
       receiver_name, receiver_phone, receiver_address
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
     `,
     [
       newOrderId,
