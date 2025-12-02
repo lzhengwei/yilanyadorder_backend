@@ -98,6 +98,7 @@ app.get("/api/order/search", async (req, res) => {
     // === 共同的 SELECT 欄位（新增取貨資訊） ===
     const baseSelect = `
       SELECT 
+        o.created_at,
         o.order_id,
         o.buyer_name,
         o.buyer_phone,
