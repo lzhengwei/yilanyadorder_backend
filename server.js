@@ -148,5 +148,32 @@ app.get("/api/order/search", async (req, res) => {
   }
 });
 
+app.post("/api/message", async (req, res) => {
+  try {
+    const { name, phone, lineid, content } = req.body;
+
+    if (!name || !phone || !lineid || !content) {
+      return res.status(400).json({ message: "請填寫所有欄位" });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO messages (name, phone, lineid, content)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, created_at`,
+      [name, phone, content]
+    );
+
+    return res.json({
+      status: "success",
+      message_id: result.rows[0].id,
+      created_at: result.rows[0].created_at
+    });
+
+  } catch (err) {
+    console.error("留言寫入失敗：", err);
+    return res.status(500).json({ message: "伺服器錯誤，無法寫入留言" });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Backend running on port ${PORT}`));
