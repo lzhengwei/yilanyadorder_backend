@@ -160,8 +160,8 @@ app.post("/api/message", async (req, res) => {
       `INSERT INTO messages (name, phone, lineid, content)
        VALUES ($1, $2, $3, $4)
        RETURNING id, created_at`,
-      [name, phone, content]
-    );
+      [name, phone, lineid, content]
+    );s
 
     return res.json({
       status: "success",
