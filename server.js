@@ -161,7 +161,7 @@ app.post("/api/message", async (req, res) => {
        VALUES ($1, $2, $3, $4)
        RETURNING id, created_at`,
       [name, phone, lineid, content]
-    );s
+    );
 
     return res.json({
       status: "success",
