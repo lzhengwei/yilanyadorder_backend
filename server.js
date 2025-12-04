@@ -175,5 +175,19 @@ app.post("/api/message", async (req, res) => {
   }
 });
 
+app.get("/api/message/all", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, name, phone, content, created_at
+      FROM messages
+      ORDER BY created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("讀取留言失敗：", err);
+    res.status(500).json({ message: "Server error loading messages" });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Backend running on port ${PORT}`));
