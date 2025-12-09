@@ -189,5 +189,68 @@ app.get("/api/message/all", async (req, res) => {
   }
 });
 
+// === Revert Order ===
+// 傳入 order_id → 還原庫存 → 刪除訂單
+app.put("/api/order/revert/:order_id", async (req, res) => {
+  const { order_id } = req.params;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // 1️⃣ 檢查訂單是否存在
+    const orderCheck = await client.query(
+      "SELECT order_id FROM orders WHERE order_id = $1",
+      [order_id]
+    );
+
+    if (orderCheck.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // 2️⃣ 取出所有 order_items 並加回產品庫存
+    const items = await client.query(
+      `
+      SELECT product_id, quantity
+      FROM order_items
+      WHERE order_id = $1
+      `,
+      [order_id]
+    );
+
+    for (const item of items.rows) {
+      await client.query(
+        `
+        UPDATE products
+        SET stock = stock + $1
+        WHERE id = $2
+        `,
+        [item.quantity, item.product_id]
+      );
+    }
+
+    // 3️⃣ 刪除訂單 → 會自動刪除 order_items (ON DELETE CASCADE)
+    await client.query(
+      `
+      DELETE FROM orders
+      WHERE order_id = $1
+      `,
+      [order_id]
+    );
+
+    await client.query("COMMIT");
+
+    res.json({ message: "Order reverted successfully", order_id });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Error reverting order:", err);
+    res.status(500).json({ message: "Server error", error: err.toString() });
+  } finally {
+    client.release();
+  }
+});
+
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Backend running on port ${PORT}`));
