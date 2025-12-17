@@ -178,7 +178,7 @@ app.post("/api/message", async (req, res) => {
 app.get("/api/message/all", async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT id, name, phone, content, created_at
+      SELECT id, name, phone, lineid,content, created_at
       FROM messages
       ORDER BY created_at DESC
     `);
